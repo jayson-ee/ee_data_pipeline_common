@@ -1,0 +1,48 @@
+config {
+    type: "table"
+}
+
+with shopify as (
+
+select 
+date
+,marketing_channel
+,medium
+,campaign
+,count(distinct order_id) orders
+from ${ref("orderlines_shopify_stg04_with_source")} 
+where `transaction_type` = 'Order'
+group by date,marketing_channel, medium, campaign
+)
+
+,website_marketing_joined as (
+SELECT
+coalesce(shopify.date,marketing.date) date
+,coalesce(shopify.marketing_channel,marketing.marketing_channel) marketing_channel
+,coalesce(shopify.medium,marketing.medium) medium
+,coalesce(shopify.campaign,marketing.campaign) campaign
+,coalesce(marketing.marketing_cost,marketing.marketing_cost) marketing_cost
+from shopify
+full outer JOIN ${ref("channels_marketing_stg02_union_gad_fb")} marketing
+ON shopify.date = marketing.date
+and shopify.marketing_channel = marketing.marketing_channel
+and shopify.medium = marketing.medium
+and shopify.campaign = marketing.campaign
+)
+
+,final as (
+select coalesce(website_marketing_with_unknown.date,shopify.date) date
+,coalesce(website_marketing_with_unknown.marketing_channel,shopify.marketing_channel) marketing_channel
+,coalesce(website_marketing_with_unknown.medium,shopify.medium) medium
+,coalesce(website_marketing_with_unknown.campaign,shopify.campaign) campaign
+,website_marketing_with_unknown.* except(date, marketing_channel, medium, campaign)
+,shopify.* except(date, marketing_channel, medium, campaign)
+from website_marketing_joined website_marketing_with_unknown
+full outer join shopify 
+on website_marketing_with_unknown.date = shopify.date
+and website_marketing_with_unknown.marketing_channel = shopify.marketing_channel
+and website_marketing_with_unknown.medium = shopify.medium
+and website_marketing_with_unknown.campaign = shopify.campaign
+)
+
+select * from final

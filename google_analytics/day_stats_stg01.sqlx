@@ -1,0 +1,18 @@
+config {
+    type: "table"
+}
+
+with final as (
+select
+date
+,marketing_channel,medium, campaign, device, device_brand, device_model, operating_system, operating_system_version, browser, browser_version
+,count(distinct user_pseudo_id) users
+,count(distinct if(is_user_first_touchpoint, user_pseudo_id,null)) new_users
+,count(distinct unique_session_id) sessions
+,count(distinct if(is_session_engaged_calculated, unique_session_id,null)) engaged_sessions
+from ${ref("pages_devices_ga4_stg01")} 
+group by date,  marketing_channel,medium, campaign, device, device_brand, device_model, operating_system, operating_system_version, browser, browser_version)
+
+
+select *
+from final

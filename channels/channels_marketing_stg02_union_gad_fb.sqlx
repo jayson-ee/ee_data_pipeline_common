@@ -1,0 +1,11 @@
+config {
+    type: "table"
+}
+
+SELECT 
+marketing_channel, medium, campaign, date, marketing_cost, clicks, impressions
+FROM ${ref("channels_fb_stg01")}
+UNION ALL
+SELECT 
+marketing_channel, medium, campaign, date, marketing_cost, clicks, impressions
+FROM ${ref("channels_gads_stg01")}

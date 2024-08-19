@@ -1,0 +1,26 @@
+config {
+    type: "table"
+}
+
+with campaign_names_from_gclid as (
+select 
+events.* except(gclid_ga4,gclid_from_url)
+,gclid_ga4_join.campaign_name campaign_based_on_gclid_ga4
+,gclid_from_utm_join.campaign_name campaign_based_on_gclid_from_utm
+from ${ref("events_ga4_stg04_with_session_engaged_calculated")} events
+left join ${ref("google_ads_click_ids_stg02_with_campaign_name")} gclid_ga4_join
+on events.gclid_ga4 = gclid_ga4_join.gclid
+left join ${ref("google_ads_click_ids_stg02_with_campaign_name")} gclid_from_utm_join
+on events.gclid_from_url = gclid_from_utm_join.gclid
+)
+
+,campaign_name_clean as (
+select 
+* except(campaign_ga4,campaign_based_on_gclid_ga4,campaign_based_on_gclid_from_utm)
+,coalesce(campaign_based_on_gclid_from_utm,campaign_based_on_gclid_ga4,campaign_ga4) campaign
+from campaign_names_from_gclid
+)
+
+select 
+*
+from campaign_name_clean

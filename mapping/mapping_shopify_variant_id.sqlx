@@ -1,0 +1,49 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`
+}
+
+with distinct_variant_ids as 
+(select distinct
+orderline_variant_id
+,orderline_name
+,order_timestamp
+,order_date start_date
+,first_orderline_name
+from
+(select 
+order_date
+,order_timestamp
+,orderline_variant_id
+,orderline_name
+,first_value (orderline_name) over (partition by orderline_variant_id order by order_timestamp desc) latest_orderline_name
+,first_value (orderline_name) over (partition by orderline_variant_id order by order_timestamp asc) first_orderline_name
+,ifnull(orderline_name <> lag(orderline_name) over (partition by orderline_variant_id order by order_timestamp asc),true)  is_new_name
+from ${ref("orderlines_shopify_stg01_unnest_data")}
+where orderline_variant_id is not null
+)
+where is_new_name
+)
+,variant_first_date as (
+select distinct 
+date(1,1,1) start_date
+,timestamp(date(1,1,1)) order_timestamp
+,orderline_variant_id
+,first_orderline_name orderline_name
+
+from distinct_variant_ids
+)
+,variant_id_names as (
+select * 
+except(start_date)
+,start_date
+,ifnull(date_add(lead(start_date) over (partition by orderline_variant_id order by order_timestamp asc),interval -1 day),date(9999,12,31)) end_date
+from (
+select start_date,order_timestamp,orderline_variant_id, orderline_name from distinct_variant_ids
+union all
+select start_date,order_timestamp,orderline_variant_id, orderline_name from variant_first_date
+)
+)
+
+select *
+from variant_id_names

@@ -1,0 +1,38 @@
+config {
+type: 'table'
+}
+
+with order_level_from_orderline as (
+select 
+order_id
+,is_first_order
+,customer_id
+,order_date  
+,sum(net_sales) net_sales
+,first_value(order_date) over (partition by customer_id order by order_date asc) first_order_date
+from ${ref("orderlines_level_final")}
+where customer_id is not null
+group by 
+order_id
+,is_first_order
+,customer_id
+,order_date)
+
+
+select 
+* except (months_after_first_order)
+,concat(if(months_after_first_order<10 and months_after_first_order>0,'Month 0','Month '),cast(months_after_first_order as string)) months_after_first_order
+from
+(select 
+* except(cohort_size)
+,max(cohort_size) over (partition by month) cohort_size
+from
+(select
+date_trunc(first_order_date,month) month
+,count(distinct if(is_first_order,customer_id,null)) cohort_size
+,count(distinct if(is_first_order,null,customer_id)) customers
+,date_diff(order_date, first_order_date, month) months_after_first_order
+
+from order_level_from_orderline
+group by month,months_after_first_order
+))

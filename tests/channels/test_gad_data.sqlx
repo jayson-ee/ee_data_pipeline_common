@@ -1,0 +1,31 @@
+config {
+    type: 'assertion',
+    schema: `${settings.tests_dataset}`,
+    dependencies: "google_ads_expected"
+}
+
+with expected as (
+select
+date,
+round(sum(cost),0) cost
+from `${settings.tests_google_ads_expected_table}`
+group by date
+)
+
+,actual as (
+select
+date,
+round(sum(marketing_cost),0) marketing_cost
+from ${ref("channels_marketing_stg03_website_marketing_shopify")}
+where marketing_channel = 'Google Ads' 
+group by date 
+)
+
+select
+expected.date,
+expected.cost as expected_cost,
+actual.marketing_cost as actual_cost
+from expected
+full outer join actual
+on actual.date = expected.date
+where expected.cost != actual.marketing_cost

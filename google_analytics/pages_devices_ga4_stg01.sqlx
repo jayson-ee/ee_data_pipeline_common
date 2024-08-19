@@ -1,0 +1,35 @@
+config {
+    type: "table"
+}
+
+with base as (
+select
+date
+,event_timestamp
+,page
+,page_category
+,event_name
+,user_pseudo_id
+,unique_session_id
+,ga_session_id
+,is_session_engaged_ga4
+,is_session_engaged_calculated
+,landing_page
+,exit_page
+,time_to_next_event_timestamp_sec
+,first_value (marketing_channel ignore nulls) over (partition by unique_session_id order by event_timestamp asc) marketing_channel
+,first_value(medium ignore nulls) over (partition by unique_session_id order by event_timestamp asc) medium
+,first_value(campaign ignore nulls) over (partition by unique_session_id order by event_timestamp asc) campaign
+,first_value (device ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device
+,first_value (device_brand ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device_brand
+,first_value (device_model ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device_model
+,first_value (operating_system ignore nulls) over (partition by unique_session_id order by event_timestamp asc) operating_system
+,first_value (operating_system_version ignore nulls) over (partition by unique_session_id order by event_timestamp asc) operating_system_version
+,first_value (browser ignore nulls) over (partition by unique_session_id order by event_timestamp asc) browser
+,first_value (browser_version ignore nulls) over (partition by unique_session_id order by event_timestamp asc) browser_version
+,rank() over (partition by user_pseudo_id order by event_timestamp asc) = 1 is_user_first_touchpoint
+
+from ${ref("events_ga4_stg05_with_campaign_name_from_gclid")} )
+
+select *
+from base

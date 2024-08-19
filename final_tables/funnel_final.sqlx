@@ -1,0 +1,9 @@
+config {
+    type: "table",
+    schema: `${settings.final_dataset}`
+}
+
+SELECT
+*
+from ${ref("funnel_stg01_selected_events")} 
+

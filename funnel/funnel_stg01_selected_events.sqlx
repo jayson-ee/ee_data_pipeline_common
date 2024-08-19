@@ -1,0 +1,59 @@
+config {
+    type: "table"
+}
+
+with selected_events as (
+select
+date
+,event_name
+,user_pseudo_id 
+from ${ref("events_ga4_stg05_with_campaign_name_from_gclid")} 
+where event_name in ('page_view','view_item','add_to_cart')
+)
+
+, event_names_clean as (
+select * except(event_name)
+,case event_name
+when 'page_view' then 'Users on site'
+when 'view_item' then 'Product View (user count)'
+when 'add_to_cart' then 'Add to Cart (user count)'
+end event_name
+
+from selected_events
+)
+
+,order_list as (
+select distinct
+date
+,customer_id
+,order_id
+from ${ref("orderlines_level_final")} 
+where transaction_type = 'Order'
+)
+
+,orders_and_events_union as (
+
+select
+date
+,user_pseudo_id
+,event_name
+from event_names_clean
+
+union all 
+
+select
+date
+,customer_id
+,'Orders (user count)' event_name
+from order_list
+)
+
+,final as (
+select 
+generate_uuid() pk
+,*
+from orders_and_events_union
+)
+
+select *
+from final

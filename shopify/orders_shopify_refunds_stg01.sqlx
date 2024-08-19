@@ -1,0 +1,27 @@
+config {
+    type: 'table'
+}
+with order_adjustments_unnested as (
+  select 
+order_id
+,date(safe.datetime(created_at,'America/Chicago')) refund_date
+,safe_cast(JSON_EXTRACT_SCALAR(order_adj, '$.amount') as float64)  amount
+, JSON_EXTRACT_SCALAR(order_adj, '$.kind') kind
+, ifnull(safe_cast(JSON_EXTRACT_SCALAR(order_adj, '$.tax_amount_set.shop_money.amount') as float64),0) order_total_tax
+from `${settings.shopify_refunds_table}`
+join UNNEST(JSON_EXTRACT_ARRAY(order_adjustments)) AS order_adj 
+)
+
+,order_adjustments as (
+  select order_id, refund_date
+  ,sum(if(lower(kind) <> 'shipping_refund',amount,null)) order_refund
+  ,sum(order_total_tax) order_total_tax
+  ,sum(if(lower(kind) = 'shipping_refund',amount,null)) order_refund_shipping
+  from order_adjustments_unnested
+  group by order_id, refund_date)
+
+select * 
+from order_adjustments
+-- where refund_date = '2024-03-15'
+-- order by order_adjustments
+--  where order_id = 5141135851574

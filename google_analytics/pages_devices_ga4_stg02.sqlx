@@ -1,0 +1,25 @@
+config {
+    type: "table"
+}
+
+with final as (
+select *
+,entrances - engaged_entrances bounces
+from
+(select
+date
+,page,page_category,marketing_channel,medium, campaign, device, device_brand, device_model, operating_system, operating_system_version, browser, browser_version
+,sum(time_to_next_event_timestamp_sec) time_on_page_sec
+,countif(event_name = 'page_view') pageviews
+,count(distinct if(event_name = 'page_view', unique_session_id,null)) unique_pageviews
+-- ,count(distinct if(event_name = 'session_start', unique_session_id,null)) entrances
+,count(distinct if(page = landing_page, unique_session_id,null)) entrances
+,count(distinct if(page = exit_page, unique_session_id,null)) exits
+-- ,count(distinct unique_session_id) sessions
+,count(distinct if(page = landing_page and is_session_engaged_calculated, unique_session_id,null)) engaged_entrances
+from ${ref("pages_devices_ga4_stg01")} 
+group by date, page, page_category, marketing_channel,medium, campaign, device, device_brand, device_model, operating_system, operating_system_version, browser, browser_version)
+)
+
+select *
+from final

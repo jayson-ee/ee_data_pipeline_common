@@ -1,0 +1,90 @@
+config {
+    type: "table"
+}
+
+with event_base as (
+select 
+* except(session_engaged_param)
+,concat(user_pseudo_id,ga_session_id) unique_session_id
+,ifnull(first_value(session_engaged_param ignore nulls) over (partition by ga_session_id order by session_engaged_param desc),true) is_session_engaged_ga4
+,datetime(event_timestamp,'America/Chicago') event_datetime_ct
+from
+(select
+date(datetime(timestamp_micros(event_timestamp),'America/Chicago')) date
+,timestamp_micros(event_timestamp) event_timestamp
+,event_name
+,user_pseudo_id
+,(select value.int_value from unnest (event_params) where key = 'ga_session_id') ga_session_id
+,(select value.string_value from unnest (event_params) where key = 'page_location') page_full_url
+,traffic_source.name campaign_ga4
+,lower(traffic_source.medium) medium
+,traffic_source.source source
+,collected_traffic_source.gclid gclid_ga4
+,ecommerce.transaction_id transaction_id
+,(select value.string_value from unnest (event_params) where key = 'transaction_id') transaction_id_param
+,(select ifnull(coalesce(value.string_value,cast(value.int_value as string))='1',true) from unnest (event_params) where key = 'session_engaged') session_engaged_param
+,case 
+    when lower(traffic_source.source) = 'google' and lower(traffic_source.medium) = 'cpc' then 'Google Ads'
+    when lower(traffic_source.source) = 'google' and lower(traffic_source.medium) = 'organic' then 'Google Organic'
+    when lower(traffic_source.source) = 'bing' and lower(traffic_source.medium) = 'cpc' then 'Bing Ads'
+    when lower(traffic_source.source) = 'bing' and lower(traffic_source.medium) = 'organic' then 'Bing Organic'
+    when lower(traffic_source.source) in ('tiktok','tiktok_ads') then 'TikTok Ads'
+    when lower(traffic_source.source) in ('facebook','meta','fb','facebook.com') and lower(traffic_source.medium) in ('paid','cpc') then 'Facebook Ads'
+    when lower(traffic_source.source) in ('facebook','meta','fb') and (lower(traffic_source.medium) in ('organic', 'referral') or traffic_source.medium is null) then 'Facebook Organic'
+    when lower(traffic_source.source) = 'twitter' and lower(traffic_source.medium) in ('paid','cpc') then 'Twitter Ads'
+    when lower(traffic_source.source) = 'linkedin' and lower(traffic_source.medium) in ('paid','cpc') then 'LinkedIn Ads'
+    when lower(traffic_source.source) = 'instagram' and lower(traffic_source.medium) in ('paid','cpc') then 'Instagram Ads'
+    when lower(traffic_source.source) in ('igshopping','ig') and lower(traffic_source.medium) in ('social') then 'Instagram Social'
+    when lower(traffic_source.source) in ('facebook','fb','facebook.com','meta') and lower(traffic_source.medium) in ('social') then 'Facebook Social'
+    -- when lower(traffic_source.source) in ('smile_rewards','shop_app','shop.app','refersion') then 'Affiliates'
+    when lower(traffic_source.source) = 'youtube' and lower(traffic_source.medium) in ('paid','cpc') then 'YouTube Ads'
+    when lower(traffic_source.medium) = 'organic' then 'Other Organic'
+    when lower(traffic_source.medium) = 'display' then 'Display'
+    when regexp_contains(lower(traffic_source.medium),r'email') then 'Email'
+    when lower(traffic_source.medium) = 'sms' then 'SMS'
+    when lower(traffic_source.medium) = 'referral' then 'Referral'
+    when lower(traffic_source.medium) in ('affiliate') then 'Affiliates'
+    when lower(traffic_source.source) = '(direct)' and lower(traffic_source.medium) = '(none)' then 'Direct'
+    when lower(traffic_source.source) in ('refersion') then 'Refersion'
+    else 'Other'
+end marketing_channel
+,device.category device
+,device.mobile_brand_name device_brand
+,device.mobile_model_name device_model
+,device.operating_system operating_system
+,device.operating_system_version operating_system_version
+,device.web_info.browser 
+,device.web_info.browser_version
+,(select array_agg(struct(item_id, item_name)) from unnest (items)) items_arr
+from `${settings.ga4_table}`
+where not(regexp_contains(_table_suffix,'intraday_'))
+))
+
+, pages_clean as(
+select * except (page)
+,ifnull(regexp_extract(page,r'sandbox/(?:modern|legacy)(.+)$'),page) page
+from
+(select *
+,regexp_replace(ifnull(regexp_extract(page_full_url,r'^[^?]*'),page_full_url), r'^https?://[^/]+', '') page
+from event_base
+)
+)
+
+,landing_and_exit_pages as (
+select 
+*
+,first_value (page ignore nulls) over (partition by unique_session_id order by event_timestamp asc) landing_page
+,first_value (page ignore nulls) over (partition by unique_session_id order by event_timestamp desc) exit_page
+from pages_clean
+)
+
+,gclids_from_url as (
+select
+* 
+,regexp_extract(page_full_url, r'gclid=([a-zA-Z0-9_-]+)(?:&|$)') gclid_from_url
+from landing_and_exit_pages
+)
+
+select  *
+,GENERATE_UUID() pk
+from gclids_from_url

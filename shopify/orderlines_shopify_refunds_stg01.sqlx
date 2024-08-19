@@ -1,0 +1,60 @@
+config {
+    type: 'table'
+}
+
+with orders_taxes_included as (
+select
+id order_id,
+max(ifnull(taxes_included,false)) is_taxes_included,
+from `${settings.shopify_orders_table}`
+group by order_id
+)
+
+,unnested as (
+      SELECT 
+    refunds.order_id AS order_id,
+    CAST(CAST(DATETIME(CAST(created_at AS TIMESTAMP),'America/Chicago') AS TIMESTAMP) AS DATE) AS refund_date,
+    JSON_EXTRACT_SCALAR(orderline_refunds, '$.line_item.title') AS orderline_name,
+    JSON_EXTRACT_SCALAR(orderline_refunds, '$.line_item.sku') AS orderline_sku,
+    JSON_EXTRACT_SCALAR(orderline_refunds, '$.line_item.product_id') AS orderline_product_id,
+    PARSE_NUMERIC(JSON_EXTRACT_SCALAR(orderline_refunds, '$.quantity')) AS items_sold,
+    PARSE_NUMERIC(JSON_EXTRACT_SCALAR(orderline_refunds, '$.line_item.total_discount')) AS orderline_discounts,
+    PARSE_NUMERIC(JSON_EXTRACT_SCALAR(orderline_refunds, '$.subtotal.')) AS orderline_refund,
+    PARSE_NUMERIC(JSON_EXTRACT_SCALAR(orderline_refunds, '$.total_tax')) AS orderline_total_tax,
+    is_taxes_included
+  FROM  `${settings.shopify_refunds_table}` refunds
+    left join UNNEST(JSON_EXTRACT_ARRAY(refund_line_items)) AS orderline_refunds 
+    left join orders_taxes_included on refunds.order_id = orders_taxes_included.order_id
+    where ARRAY_LENGTH(JSON_EXTRACT_ARRAY(refund_line_items)) > 0 
+)
+
+
+,orderline_refunds as (SELECT
+  order_id,
+  refund_date,
+  orderline_name,
+  orderline_sku,
+  orderline_product_id,
+  'NA' orderline_sku_category,
+  -items_sold items_sold,
+  -(orderline_refund- if(is_taxes_included,ifnull(orderline_total_tax,0),0)) as orderline_refund,
+  0 as orderline_discounts,
+
+  -- -(orderline_discounts) as orderline_discounts,
+--   -((orderline_gross_sales * orderline_quantity) - (orderline_discounts * orderline_quantity)) AS orderline_net_sales,
+  -(orderline_total_tax) as orderline_total_tax,
+safe_divide(orderline_refund,sum(orderline_refund) over (partition by order_id)) orderline_refund_share_in_order
+FROM unnested
+)
+
+, with_collection_name as (
+select orderline_refunds.* 
+,collections.collection_name
+from orderline_refunds orderline_refunds
+left join ${ref("mapping_product_id_to_collection_name")} collections
+on orderline_refunds.orderline_product_id = collections.product_id
+)
+
+select *
+from with_collection_name
+--  where order_id = 5132390858806

@@ -1,0 +1,67 @@
+config {
+    type: "table"
+}
+
+with all_data as (
+
+select * except(order_date, order_timestamp)
+,max(order_date) over (partition by order_id) order_date
+,max(order_timestamp) over (partition by order_id) order_timestamp
+,if(transaction_type = 'Refund', ifnull(orderline_refund,0)+ifnull(order_refund,0),null) refunds
+from
+(select 
+'Order' transaction_type
+,order_date date
+,order_date
+,order_timestamp
+,order_id
+,orderline_name
+,orderline_sku
+,orderline_sku_category
+,collection_name
+,items_sold
+,orderline_gross_sales gross_sales
+,orderline_discount discount
+,orderline_tax tax
+,shipping_fee 
+,fulfillment_cost
+,orderline_cogs
+,null orderline_refund
+,null order_refund
+,discount_code
+,discount_code_type
+from ${ref("orderlines_shopify_stg02_with_order_level_data")} 
+
+union all
+
+select 
+'Refund' transaction_type
+,refund_date date
+,null order_date
+,null order_timestamp
+,order_id
+,orderline_name
+,orderline_sku
+,orderline_sku_category
+,collection_name
+,items_sold 
+,0 orderline_gross_sales 
+,orderline_discounts 
+,orderline_total_tax 
+,order_refund_shipping shipping_fee
+,0 fulfillment_cost
+,0 orderline_cogs
+,orderline_refund
+,order_refund
+,null discount_code
+,null discount_code_type
+from ${ref("orderlines_shopify_refunds_stg02")} 
+))
+
+
+select 
+orders.*  except (order_date, order_timestamp, order_shipping_tax,order_shipping_fee, fulfillment_cost)
+,all_data.*  except (order_id,discount_code,discount_code_type)
+from all_data
+left join ${ref("orders_shopify_stg01")} orders
+on all_data.order_id = orders.order_id

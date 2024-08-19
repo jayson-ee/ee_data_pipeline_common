@@ -1,0 +1,14 @@
+config {
+    type: "table"
+}
+
+select
+date_start as date,
+'Facebook Ads' `marketing_channel`,
+'cpc' medium,
+campaign_name campaign,
+sum(IFNULL(spend,0)) as marketing_cost,
+sum(IFNULL(clicks, 0)) as clicks,
+sum(IFNULL(impressions, 0)) as impressions
+from `${settings.facebook_ads_table}` 
+group by date_start, marketing_channel, medium, campaign

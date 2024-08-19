@@ -1,0 +1,56 @@
+config {
+    type: "table"
+}
+
+with all_data as (
+select 
+order_id
+,order_number
+,order_date, order_timestamp
+,orderline_name
+,orderline_sku
+,orderline_sku_category
+,collection_name
+,items_sold
+,orderline_gross_sales
+,orderline_discount
+-- ,orderline_net_sales
+,orderline_tax
+,0 shipping_fee
+,0 fulfillment_cost
+,orderline_cogs
+,null discount_code
+,null discount_code_type
+from ${ref("orderlines_shopify_stg01_unnest_data")} 
+
+union all
+
+select 
+order_id
+,order_number
+,order_date, order_timestamp
+,null orderline_name
+,null orderline_sku
+,null orderline_sku_category
+,null collection_name
+,0 items_sold
+,0 orderline_gross_sales
+,0 orderline_discount
+-- ,0 orderline_net_sales
+,order_shipping_tax
+,order_shipping_fee
+,fulfillment_cost
+,0 orderline_cogs
+,discount_code
+,discount_code_type
+from ${ref("orders_shopify_stg01")} 
+)
+
+-- select 
+-- orders.* except (order_shipping_tax,order_shipping_fee)
+-- ,all_data.* except (order_id, order_date)
+-- from all_data
+-- left join ${ref("orders_stg01")} orders
+-- on all_data.order_id = orders.order_id
+
+select * from all_data

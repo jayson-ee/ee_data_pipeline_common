@@ -1,0 +1,16 @@
+config {
+    type: "table"
+}
+
+with session_level_metrics as (
+select
+* 
+,sum(time_to_next_event_timestamp_sec) over (partition by unique_session_id) session_duration
+,count(distinct if(event_name = 'page_view',page,null)) over (partition by unique_session_id) pages_during_session
+,countif(event_name = 'purchase') over (partition by unique_session_id) purchases_during_session
+from ${ref("events_ga4_stg03_with_time_to_next_event")}
+)
+
+select * except (session_duration,pages_during_session,purchases_during_session)
+,session_duration > 10 or pages_during_session > 1 or purchases_during_session > 0 is_session_engaged_calculated
+from session_level_metrics

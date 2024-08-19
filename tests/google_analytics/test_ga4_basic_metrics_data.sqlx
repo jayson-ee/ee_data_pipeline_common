@@ -1,0 +1,35 @@
+config { 
+type: "assertion",
+schema: `${settings.tests_dataset}`,
+dependencies: "ga4_basic_metrics_expected" 
+}
+
+with expected as (
+select
+date
+,device
+,sum(users) users_expected
+,sum(sessions) sessions_expected
+from `${settings.tests_ga4_basic_metrics_expected_table}`
+group by date,device)
+
+, actual as (
+select
+date
+,device
+,count(distinct user_pseudo_id) users_actual
+,count(distinct unique_session_id) sessions_actual
+from ${ref("events_ga4_stg05_with_campaign_name_from_gclid")}
+group by date,device
+)
+
+
+select
+expected.*, actual.* except(date,device)
+from expected
+full outer join actual
+on actual.date = expected.date
+and actual.device = expected.device
+where actual.users_actual != expected.users_expected
+or actual.sessions_actual != expected.sessions_expected
+

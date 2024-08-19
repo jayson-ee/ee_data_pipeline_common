@@ -1,0 +1,9 @@
+config {
+    type: "table",
+    dependencies: ["test_orderlines_shopify_stg04"]
+}
+
+
+select *
+,gross_sales-discount+ifnull(refunds,0) net_sales
+from ${ref("orderlines_shopify_stg04_with_source")}

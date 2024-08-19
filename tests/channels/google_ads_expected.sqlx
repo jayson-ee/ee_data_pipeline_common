@@ -1,0 +1,11 @@
+config {
+    type: "operations",
+    name: "google_ads_expected",
+    schema: `${settings.tests_dataset}`
+}
+
+create schema if not exists ${settings.tests_dataset} ;
+CREATE OR REPLACE EXTERNAL TABLE
+  ${settings.tests_google_ads_expected_table} OPTIONS ( format = 'GOOGLE_SHEETS',
+    skip_leading_rows = ${settings.tests_google_ads_expected_table_skip_leading_rows},
+    uris = ['${settings.tests_google_ads_expected_table_url}'] )

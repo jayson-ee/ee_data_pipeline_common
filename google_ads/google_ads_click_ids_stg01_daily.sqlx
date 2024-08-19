@@ -1,0 +1,36 @@
+config {
+    type: "incremental",
+
+}
+
+select 
+current_timestamp ts
+,ad_group_id
+,campaign_id
+,click_view_gclid
+,customer_id
+,ad_group_status
+,click_view_ad_group_ad
+,click_view_area_of_interest_city
+,click_view_area_of_interest_country
+,click_view_area_of_interest_metro
+,click_view_area_of_interest_most_specific
+,click_view_area_of_interest_region
+,click_view_keyword
+,click_view_keyword_info_match_type
+,click_view_keyword_info_text
+,click_view_location_of_presence_city
+,click_view_location_of_presence_country
+,click_view_location_of_presence_metro
+,click_view_location_of_presence_most_specific
+,click_view_location_of_presence_region
+,click_view_page_number
+,customer_descriptive_name
+,metrics_clicks
+,segments_ad_network_type
+,segments_click_type
+,segments_date
+,segments_device
+,segments_slot
+from `${settings.google_ads_gclids_table}`
+where date_diff(current_date,segments_date,day) <= 30
