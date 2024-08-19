@@ -1,0 +1,47 @@
+config {
+type: "assertion",
+schema: `${settings.tests_dataset}`,
+dependencies: "shopify_expected" 
+}
+
+with expected as (
+select distinct order_id
+, round(sum(returns) over orderidw,2) returns 
+, round(sum(gross_sales) over orderidw,2) gross_sales
+, round(sum(taxes) over orderidw,2) taxes
+, round(sum(discounts) over orderidw,2) discounts
+, round(sum(shipping) over orderidw,2) shipping
+,min(day) over() date_from
+,max(day) over() date_to
+from `${settings.tests_shopify_expected_table}`
+window orderidw as (partition by order_id)
+)
+
+,exceptions as (
+select exceptions.* from unnest([
+    struct(5136835903542 as order_id, 'This order was places in March then an item was removed and added in april. The date in bigquery stays as march which is seems to be a bug on airbyte side. If data from shopify was taken up until 2024/04/11 then this discrepancy resolves' as reason)
+]) exceptions
+)
+,actual as (
+select order_id, round(sum(shipping_fee),2) shipping, round(sum(tax),2) taxes, round(sum(refunds),2) returns, round(sum(gross_sales),2) gross_sales, -round(sum(discount),2) discounts
+from ${ref("orderlines_shopify_stg05_enhanced")}
+where date between (select min(date_from) from expected) and (select max(date_to) from expected)
+group by order_id
+)
+
+select coalesce(actual.order_id, expected.order_id) order_id
+,array_agg(issues order by issues) issues
+from actual
+full outer join expected 
+on actual.order_id =expected.order_id
+left join unnest([if(ifnull(ifnull(actual.gross_sales,0) != ifnull(expected.gross_sales,0), true),concat('actual.gross_sales=',actual.gross_sales,' expected.gross_sales=',expected.gross_sales),null)
+,if(ifnull(ifnull(actual.returns,0) != ifnull(expected.returns,0), true),concat('actual.returns=',actual.returns,' expected.returns=',expected.returns),null)
+,if(ifnull(ifnull(actual.taxes,0) != ifnull(expected.taxes,0), true),concat('actual.taxes=',actual.taxes,' expected.taxes=',expected.taxes),null)
+,if(ifnull(ifnull(actual.discounts,0) != ifnull(expected.discounts,0), true),concat('actual.discounts=',actual.discounts,' expected.discounts=',expected.discounts),null)
+,if(ifnull(ifnull(actual.shipping,0) != ifnull(expected.shipping,0), true),concat('actual.shipping=',actual.shipping,' expected.shipping=',expected.shipping),null)
+]) issues 
+left join exceptions on coalesce(actual.order_id, expected.order_id) = exceptions.order_id
+where 
+exceptions.order_id is null 
+and issues is not null
+group by order_id

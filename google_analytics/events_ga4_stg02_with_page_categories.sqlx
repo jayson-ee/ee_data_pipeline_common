@@ -1,0 +1,33 @@
+config {
+    type: "table"
+}
+
+
+with page_categories_arr as (
+select [
+struct(1 as rule_order, 'Homepage' as page_category ,'^/$' as regexp_rule)
+,struct(2 , 'Homepage'  ,'/shop' )
+,struct(3 , 'Homepage'  ,r'^/[a-zA-Z]{2}-[a-zA-Z]{2}(/)?$')
+,struct(4 , 'Collection Page'  ,'/collections' )
+,struct(5 , 'PDP'  ,'/products' )
+,struct(6 , 'Cart'  ,'/cart' )
+,struct(7 , 'Checkout'  ,'/checkout' )
+,struct(8 , 'Account'  ,'/account' )
+,struct(9 , 'Blogs'  ,'/blogs' )
+,struct(10 , 'Pages'  ,'/pages' )
+,struct(11, 'Search'  ,'/search-results-page' )
+,struct(12 , 'Search'  ,'/search' )
+,struct(13 , 'Policies'  ,'/policies' )
+,struct(14 , 'Technical'  ,'/wpm@' )
+,struct(15 , 'Order'  ,'/orders' )
+,struct(16 , 'Challenge'  ,'/challenge' )
+,struct(17 , 'Aftership'  ,'/aftership' )
+
+] page_category
+)
+
+select 
+events.* 
+,ifnull((select page_category.page_category from unnest (page_categories_arr.page_category) page_category where regexp_contains (events.page, page_category.regexp_rule) order by rule_order desc limit 1), 'Other') page_category
+from ${ref("events_ga4_stg01_base_table")}  events
+left join page_categories_arr on true

@@ -1,0 +1,22 @@
+config { 
+type: "assertion",
+schema: `${settings.tests_dataset}`
+}
+
+with channels as (
+select date, marketing_channel, sum(orders) orders
+from ${ref("channels_marketing_stg03_website_marketing_shopify")} 
+group by date, marketing_channel
+)
+,shopify as (
+select order_date date, ifnull(marketing_channel,'Unknown') marketing_channel,count(distinct order_id) orders
+from ${ref("orderlines_shopify_stg04_with_source")} 
+group by date, marketing_channel
+)
+
+select channels.*
+from channels
+full outer join shopify
+on channels.date=shopify.date 
+and channels.marketing_channel = shopify.marketing_channel
+where channels.orders != shopify.orders

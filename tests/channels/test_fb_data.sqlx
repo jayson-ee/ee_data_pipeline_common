@@ -1,0 +1,31 @@
+config {
+    type: "assertion",
+    schema: `${settings.tests_dataset}`,
+    dependencies: "fb_expected"
+}
+
+with expected as (
+select 
+*
+from `${settings.tests_facebook_ads_expected_table}`
+)
+
+, actual as (
+select
+cast(date as date) date,
+round(sum(marketing_cost),2) marketing_cost
+from ${ref("channels_marketing_stg03_website_marketing_shopify")}
+where marketing_channel = 'Facebook Ads'
+group by date 
+)
+
+
+select
+date
+,amount_spent_USD expected_cost
+,marketing_cost actual_cost
+from expected
+full outer join actual
+on actual.date = expected.day
+where amount_spent_USD is not null
+and marketing_cost != amount_spent_USD

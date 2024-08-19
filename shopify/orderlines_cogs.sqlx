@@ -1,0 +1,31 @@
+config {
+type: 'table'
+}
+
+with sku_price as
+(select
+case 
+when safe_cast(processed_at as timestamp) is null then safe_cast(created_at as timestamp)
+when safe_cast(created_at as timestamp) is null then safe_cast(processed_at as timestamp)
+else least(safe_cast(processed_at as timestamp), safe_cast(created_at as timestamp))
+end order_timestamp,
+JSON_EXTRACT_SCALAR(line_items, '$.sku') AS orderline_sku,
+round(IFNULL(CAST(JSON_EXTRACT_SCALAR(line_items, '$.price_set.shop_money.amount') AS float64),0),2) AS orderline_gross_sales
+from `${settings.shopify_orders_table}`
+left join UNNEST(JSON_EXTRACT_ARRAY(line_items, '$')) AS line_items
+)
+
+,max_sku_price_per_day as 
+(select 
+date(order_timestamp, 'America/Chicago') order_date
+,orderline_sku
+,max(orderline_gross_sales) max_sku_price
+from sku_price
+group by order_date, orderline_sku
+)
+
+select
+order_date,orderline_sku
+,round(max_sku_price*0.15,2) orderline_cogs
+from max_sku_price_per_day
+-- where orderline_sku = 'QRS-BROWN-20-ROSE' and order_date  = '2017-03-20'

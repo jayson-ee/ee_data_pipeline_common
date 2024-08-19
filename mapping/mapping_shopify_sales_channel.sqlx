@@ -1,0 +1,16 @@
+config {
+    type: "operations",
+    name: "mapping_shopify_sales_channel",
+    schema: "zenlytic_mapping"
+}
+
+create schema if not exists ${settings.mapping_dataset} ;
+CREATE OR REPLACE EXTERNAL TABLE ${settings.mapping_shopify_sales_channel_table} 
+(
+  source_id STRING,
+  source_name STRING
+)
+OPTIONS ( format = 'GOOGLE_SHEETS',
+    skip_leading_rows = ${settings.mapping_shopify_sales_channel_table_skip_leading_rows},
+    uris = ['${settings.mapping_shopify_sales_channel_table_url}'])
+

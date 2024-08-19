@@ -1,0 +1,351 @@
+config {
+type: 'table',
+schema: `${settings.final_dataset}`
+}
+
+select
+'orderline' data_level
+,date
+,marketing_channel
+,medium
+,campaign 
+,device
+,device_brand
+,device_model
+,operating_system
+,operating_system_version
+,browser
+,browser_version
+
+,order_id
+,order_number
+,order_name
+,customer_id
+,country
+,state
+,city
+,postcode
+,fulfillment_status
+,is_first_order
+,transaction_type
+,orderline_name
+,orderline_sku
+,orderline_sku_category
+,collection_name
+,sales_channel_shopify
+,items_sold
+,gross_sales
+,discount
+,tax
+,shipping_fee
+,fulfillment_cost
+,orderline_cogs
+,orderline_refund
+,order_refund
+,order_date
+,order_timestamp
+,refunds
+,net_sales
+,discount_code
+,discount_code_type
+
+,null users
+,null new_users
+,null sessions
+,null engaged_sessions
+,null bounces
+,null marketing_cost
+
+,landing_page page
+,null page_category
+,null pageviews
+,null unique_pageviews
+,null entrances
+,null exits
+,null time_on_page_sec
+
+,null user_pseudo_id
+,null product_views
+,null product_added_to_cart
+,null product_removed_from_cart
+
+from ${ref("orderlines_level_final")}
+
+union all
+
+select
+'channel' data_level
+,date
+,marketing_channel
+,medium
+,campaign 
+,null device
+,null device_brand
+,null device_model
+,null operating_system
+,null operating_system_version
+,null browser
+,null browser_version
+
+,null order_id
+,null order_number
+,null order_name
+,null customer_id
+,null country
+,null state
+,null city
+,null postcode
+,null fulfillment_status
+,null is_first_order
+,null transaction_type
+,null orderline_name
+,null orderline_sku
+,null orderline_sku_category
+,null collection_name
+,null sales_channel_shopify
+,null items_sold
+,null gross_sales
+,null discount
+,null tax
+,null shipping_fee
+,null fulfillment_cost
+,null orderline_cogs
+,null orderline_refund
+,null order_refund
+,null order_date
+,null order_timestamp
+,null refunds
+,null net_sales
+,null discount_code
+,null discount_code_type
+
+,null users
+,null new_users
+,null sessions
+,null engaged_sessions
+,null bounces
+,marketing_cost
+
+,null page
+,null page_category
+,null pageviews
+,null unique_pageviews
+,null entrances
+,null exits
+,null time_on_page_sec
+
+,null user_pseudo_id
+,null product_views
+,null product_added_to_cart
+,null product_removed_from_cart
+
+from ${ref("channels_level_final")}
+
+union all 
+
+select
+'page' data_level
+,date
+,marketing_channel
+,medium
+,campaign 
+,device
+,device_brand
+,device_model
+,operating_system
+,operating_system_version
+,browser
+,browser_version
+
+,null order_id
+,null order_number
+,null order_name
+,null customer_id
+,null country
+,null state
+,null city
+,null postcode
+,null fulfillment_status
+,null is_first_order
+,null transaction_type
+,null orderline_name
+,null orderline_sku
+,null orderline_sku_category
+,null collection_name
+,null sales_channel_shopify
+,null items_sold
+,null gross_sales
+,null discount
+,null tax
+,null shipping_fee
+,null fulfillment_cost
+,null orderline_cogs
+,null orderline_refund
+,null order_refund
+,null order_date
+,null order_timestamp
+,null refunds
+,null net_sales
+,null discount_code
+,null discount_code_type
+
+,null users
+,null new_users
+,null sessions
+,null engaged_sessions
+,bounces
+,null marketing_cost
+
+,page
+,page_category
+,pageviews
+,unique_pageviews
+,entrances
+,exits
+,time_on_page_sec
+
+,null user_pseudo_id
+,null product_views
+,null product_added_to_cart
+,null product_removed_from_cart
+
+from ${ref("pages_devices_level_final")}
+
+union all 
+
+select
+'product' data_level
+,date
+,marketing_channel
+,medium
+,campaign 
+,device
+,device_brand
+,device_model
+,operating_system
+,operating_system_version
+,browser
+,browser_version
+
+,null order_id
+,null order_number
+,null order_name
+,null customer_id
+,null country
+,null state
+,null city
+,null postcode
+,null fulfillment_status
+,null is_first_order
+,null transaction_type
+,orderline_name
+,null orderline_sku
+,null orderline_sku_category
+,null collection_name
+,null sales_channel_shopify
+,null items_sold
+,null gross_sales
+,null discount
+,null tax
+,null shipping_fee
+,null fulfillment_cost
+,null orderline_cogs
+,null orderline_refund
+,null order_refund
+,null order_date
+,null order_timestamp
+,null refunds
+,null net_sales
+,null discount_code
+,null discount_code_type
+
+,null users
+,null new_users
+,null sessions
+,null engaged_sessions
+,null bounces
+,null marketing_cost
+
+,null page
+,null page_category
+,null pageviews
+,null unique_pageviews
+,null entrances
+,null exits
+,null time_on_page_sec
+
+,user_pseudo_id
+,product_views
+,product_added_to_cart
+,product_removed_from_cart
+from ${ref("product_level_final")}
+
+union all 
+
+select
+'day' data_level
+,date
+,marketing_channel
+,medium
+,campaign 
+,device
+,device_brand
+,device_model
+,operating_system
+,operating_system_version
+,browser
+,browser_version
+
+,null order_id
+,null order_number
+,null order_name
+,null customer_id
+,null country
+,null state
+,null city
+,null postcode
+,null fulfillment_status
+,null is_first_order
+,null transaction_type
+,null orderline_name
+,null orderline_sku
+,null orderline_sku_category
+,null collection_name
+,null sales_channel_shopify
+,null items_sold
+,null gross_sales
+,null discount
+,null tax
+,null shipping_fee
+,null fulfillment_cost
+,null orderline_cogs
+,null orderline_refund
+,null order_refund
+,null order_date
+,null order_timestamp
+,null refunds
+,null net_sales
+,null discount_code
+,null discount_code_type
+
+,users
+,new_users
+,sessions
+,engaged_sessions
+,null bounces
+,null marketing_cost
+
+,null page
+,null page_category
+,null pageviews
+,null unique_pageviews
+,null entrances
+,null exits
+,null time_on_page_sec
+
+,null user_pseudo_id
+,null product_views
+,null product_added_to_cart
+,null product_removed_from_cart
+
+from ${ref("day_level_final")}

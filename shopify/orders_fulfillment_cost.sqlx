@@ -1,0 +1,10 @@
+config {
+    type: 'table'
+}
+
+
+select distinct
+id order_id
+,3 fulfillment_cost
+from `${settings.shopify_orders_table}`
+where lower(fulfillment_status) in ('partial','fulfilled')

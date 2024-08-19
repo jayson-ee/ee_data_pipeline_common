@@ -1,0 +1,17 @@
+config {
+    type : 'table'
+}
+
+with final as (
+select distinct
+click_view_gclid gclid
+,gclids.campaign_id
+,campaigns.campaign_name
+from ${ref("google_ads_click_ids_stg01_daily")}  gclids
+left join ${ref("mapping_google_ads_campaign_name")}  campaigns
+on gclids.campaign_id = campaigns.campaign_id
+)
+
+select 
+* 
+from final

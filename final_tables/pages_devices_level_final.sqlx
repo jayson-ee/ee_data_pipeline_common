@@ -1,0 +1,9 @@
+config {
+    type: "table",
+    schema: `${settings.final_dataset}`
+}
+
+SELECT
+*
+from ${ref("pages_devices_ga4_stg02")} 
+

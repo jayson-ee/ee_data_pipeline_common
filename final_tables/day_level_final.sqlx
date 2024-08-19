@@ -1,0 +1,10 @@
+config {
+    type: "table",
+    schema: `${settings.final_dataset}`,
+    dependencies: [ "test_ga4_basic_metrics_data"]
+}
+
+select
+*
+from ${ref("day_stats_stg01")} 
+

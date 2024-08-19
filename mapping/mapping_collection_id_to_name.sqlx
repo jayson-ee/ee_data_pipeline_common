@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`
+}
+
+with all_collection_names as (
+select
+id collection_id
+,ifnull(title, 'N/A') collection_name
+,min(date(published_at, 'America/Chicago')) start_date
+-- min(date(table_timestamp, 'America/Chicago')) start_date
+,max(current_date) end_date
+-- max(date(table_timestamp, 'America/Chicago')) end_date
+from ${settings.shopify_smart_collections_table}
+where id is not null
+group by collection_id, collection_name
+
+union all
+
+select
+id collection_id
+,ifnull(title, 'N/A') collection_name
+,min(date(published_at, 'America/Chicago')) start_date
+-- min(date(table_timestamp, 'America/Chicago')) start_date
+,max(current_date) end_date
+-- max(date(table_timestamp, 'America/Chicago')) end_date
+from ${settings.shopify_custom_collections_table}
+where id is not null
+group by collection_id, collection_name
+)
+
+select distinct
+collection_id
+,first_value(collection_name) over (partition by collection_id order by start_date desc, collection_name asc) collection_name 
+from all_collection_names

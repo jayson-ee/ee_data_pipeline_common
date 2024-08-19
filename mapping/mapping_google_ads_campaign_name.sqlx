@@ -1,0 +1,20 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`
+}
+
+
+with latest_campaign_names as 
+(
+select distinct 
+campaign_id
+,campaign_name
+from `${settings.google_ads_campaign_name_mapping_table}` 
+qualify rank() over (partition by campaign_id order by _PARTITIONTIME desc) = 1
+
+)
+
+
+select 
+*
+from latest_campaign_names

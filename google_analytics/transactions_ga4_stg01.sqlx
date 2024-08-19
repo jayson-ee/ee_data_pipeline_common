@@ -1,0 +1,35 @@
+config {
+    type: "table",
+    dependencies: ["test_events_ga4_stg05"]
+}
+
+with purchase_event_base as (
+select 
+*
+from ${ref("events_ga4_stg05_with_campaign_name_from_gclid")}
+where transaction_id is not null
+)
+
+, transactions_with_source as 
+(select distinct
+date 
+,first_value(event_datetime_ct ignore nulls) over (partition by transaction_id order by event_timestamp asc) transaction_datetime_ct
+,first_value(event_timestamp ignore nulls) over (partition by transaction_id order by event_timestamp asc) transaction_timestamp
+,transaction_id
+,marketing_channel
+,first_value(medium ignore nulls) over (partition by unique_session_id order by event_timestamp asc) medium
+,first_value(campaign ignore nulls) over (partition by unique_session_id order by event_timestamp asc) campaign
+,first_value(device ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device
+,first_value(device_brand ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device_brand
+,first_value(device_model ignore nulls) over (partition by unique_session_id order by event_timestamp asc) device_model
+,first_value(operating_system ignore nulls) over (partition by unique_session_id order by event_timestamp asc) operating_system
+,first_value(operating_system_version ignore nulls) over (partition by unique_session_id order by event_timestamp asc) operating_system_version
+,first_value(browser ignore nulls) over (partition by unique_session_id order by event_timestamp asc) browser
+,first_value(browser_version ignore nulls) over (partition by unique_session_id order by event_timestamp asc) browser_version
+,landing_page
+from purchase_event_base
+)
+
+select
+*
+from transactions_with_source

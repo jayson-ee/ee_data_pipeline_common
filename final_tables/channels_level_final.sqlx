@@ -1,0 +1,10 @@
+config {
+    type: "table",
+    schema: `${settings.final_dataset}`,
+    dependencies: [ "test_ga4_shopify_orders", "test_fb_data","test_gad_data"]
+}
+
+SELECT
+*
+from ${ref("channels_marketing_stg03_website_marketing_shopify")} 
+

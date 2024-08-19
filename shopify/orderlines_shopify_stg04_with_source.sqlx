@@ -1,0 +1,45 @@
+config {
+    type: 'table'
+}
+
+with orders_chanels_devices as (
+select 
+shopify_ga4_order_mapping.order_id
+,transactions_ga4_stg01.marketing_channel
+,transactions_ga4_stg01.medium
+,transactions_ga4_stg01.campaign 
+,transactions_ga4_stg01.device
+,transactions_ga4_stg01.device_brand
+,transactions_ga4_stg01.device_model
+,transactions_ga4_stg01.operating_system
+,transactions_ga4_stg01.operating_system_version
+,transactions_ga4_stg01.browser
+,transactions_ga4_stg01.browser_version
+,transactions_ga4_stg01.landing_page
+from ${ref("mapping_shopify_ga4_order")} shopify_ga4_order_mapping
+join ${ref("transactions_ga4_stg01")} transactions_ga4_stg01
+on transactions_ga4_stg01.transaction_id in unnest(shopify_ga4_order_mapping.ga4_transaction_ids)
+qualify row_number() over (partition by order_id order by marketing_channel is not null desc, marketing_channel asc) = 1
+)
+  
+,final as (
+select 
+orderlines.* except(marketing_channel_shopify)
+,ifnull(ifnull(marketing_channel_shopify,orders_chanels_devices.marketing_channel),'${settings.unknown_variable}') marketing_channel
+,ifnull(orders_chanels_devices.medium,'${settings.unknown_variable}') medium
+,ifnull(orders_chanels_devices.campaign,'${settings.unknown_variable}') campaign
+,ifnull(orders_chanels_devices.device,'${settings.unknown_variable}') device
+,ifnull(orders_chanels_devices.device_brand,'${settings.unknown_variable}') device_brand
+,ifnull(orders_chanels_devices.device_model,'${settings.unknown_variable}') device_model
+,ifnull(orders_chanels_devices.operating_system,'${settings.unknown_variable}') operating_system
+,ifnull(orders_chanels_devices.operating_system_version,'${settings.unknown_variable}') operating_system_version
+,ifnull(orders_chanels_devices.browser,'${settings.unknown_variable}') browser
+,ifnull(orders_chanels_devices.browser_version,'${settings.unknown_variable}') browser_version
+,ifnull(orders_chanels_devices.landing_page,'${settings.unknown_variable}') landing_page
+from ${ref("orderlines_shopify_stg03_with_refunds")} as orderlines
+left join orders_chanels_devices
+on orderlines.order_id = orders_chanels_devices.order_id
+)
+
+select *
+from final

@@ -1,0 +1,83 @@
+config {
+    type: "table"
+}
+
+with shipping_lines_unnested as
+(select * except(marketing_channel_shopify)
+, date(order_timestamp, 'America/Chicago') order_date
+,case lower(marketing_channel_shopify)
+  when 'facebook' then 'Facebook Ads'
+  when 'facebook shop' then 'Facebook Ads'
+  when 'instagram' then 'Instagram Ads'
+  else marketing_channel_shopify 
+end marketing_channel_shopify
+from (
+select  
+case 
+  when safe_cast(processed_at as timestamp) is null then safe_cast(created_at as timestamp)
+  when safe_cast(created_at as timestamp) is null then safe_cast(processed_at as timestamp)
+  else least(safe_cast(processed_at as timestamp), safe_cast(created_at as timestamp))
+end order_timestamp,
+id order_id,
+order_number,
+name order_name,
+JSON_EXTRACT_SCALAR(customer, '$.id') customer_id,
+JSON_EXTRACT_SCALAR(customer, '$.default_address.country') country,
+JSON_EXTRACT_SCALAR(customer, '$.default_address.province') state,
+JSON_EXTRACT_SCALAR(customer, '$.default_address.city') city,
+JSON_EXTRACT_SCALAR(customer, '$.default_address.zip') postcode,
+coalesce (
+  (select max(JSON_EXTRACT_SCALAR(note_attributes, '$.value')) from UNNEST(JSON_EXTRACT_ARRAY(note_attributes)) note_attributes where lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')) in ('channel', 'order_source') )
+  ,
+  (select max(
+  case 
+    when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'facebook order id') then 'Facebook Ads'
+    -- when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'refersion id') then 'Refersion'
+    when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'ebay order id') then 'eBay'
+    when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'mothership order id') then 'Mothership'
+    when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'tiktok shop discount') then 'TikTok'
+    when regexp_contains(lower(JSON_EXTRACT_SCALAR(note_attributes, '$.name')),'Walmart Purchase Order Id') then 'Walmart'
+  end) 
+  from UNNEST(JSON_EXTRACT_ARRAY(note_attributes)) note_attributes )
+) marketing_channel_shopify,
+source_name source_id,
+fulfillment_status,
+ifnull(safe_cast(JSON_EXTRACT_SCALAR(total_shipping_price_set, '$.shop_money.amount') as float64),0) - 
+(select ifnull(sum(safe_cast(JSON_EXTRACT_SCALAR(discount_allocation, '$.amount_set.shop_money.amount') as float64)),0) from unnest(JSON_EXTRACT_ARRAY(shipping_lines.discount_allocations)) discount_allocation) 
+AS order_shipping_fee,
+JSON_EXTRACT_ARRAY(shipping_lines, '$.tax_lines') AS tax_lines,
+(select JSON_EXTRACT_SCALAR(discount_codes, '$.code') from unnest(JSON_EXTRACT_ARRAY(discount_codes)) discount_codes) discount_code,
+(select JSON_EXTRACT_SCALAR(discount_codes, '$.type') from unnest(JSON_EXTRACT_ARRAY(discount_codes)) discount_codes) discount_code_type
+
+from ${settings.shopify_orders_table}
+left join UNNEST(JSON_EXTRACT_ARRAY(shipping_lines)) AS shipping_lines) 
+)
+
+,tax_lines_unnested as (
+SELECT
+* except(tax_lines)
+,ifnull((select sum(cast(JSON_EXTRACT_SCALAR(tax_lines, '$.price') as FLOAT64)) AS order_shipping_tax from unnest (tax_lines) tax_lines),0) order_shipping_tax
+FROM shipping_lines_unnested 
+)
+
+,with_fulfillment_cost as(
+select tax_lines_unnested.*, fulfillment_cost.fulfillment_cost 
+from tax_lines_unnested
+left join ${ref("orders_fulfillment_cost")} fulfillment_cost
+on tax_lines_unnested.order_id = fulfillment_cost.order_id
+)
+
+,shopify_sales_channel as (
+select * except(source_id)
+,initcap(coalesce(sales_channel.source_name,orders.source_id)) sales_channel_shopify
+from with_fulfillment_cost orders
+left join ${ref("mapping_orders_shopify_sales_channel")} sales_channel
+on orders.source_id = sales_channel.source_id
+
+)
+,final as 
+(select * 
+,rank() over (partition by customer_id order by order_timestamp asc) = 1 is_first_order
+from shopify_sales_channel)
+
+select * from final

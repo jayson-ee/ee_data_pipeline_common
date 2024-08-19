@@ -1,0 +1,11 @@
+config {
+    type: "operations",
+    name: "ga4_basic_metrics_expected",
+    schema: `${settings.tests_dataset}`
+}
+
+create schema if not exists ${settings.tests_dataset} ;
+CREATE OR REPLACE EXTERNAL TABLE
+  ${settings.tests_ga4_basic_metrics_expected_table} OPTIONS ( format = 'GOOGLE_SHEETS',
+    skip_leading_rows = ${settings.tests_ga4_basic_metrics_expected_table_skip_leading_rows},
+    uris = ['${settings.tests_ga4_basic_metrics_expected_table_url}'] )

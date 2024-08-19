@@ -1,0 +1,8 @@
+config {
+    type: "table",
+    schema: `${settings.final_dataset}`,
+    dependencies: [ "test_shopify_data", "test_ga4_shopify_orders"]
+}
+
+select *
+from ${ref("orderlines_shopify_stg05_enhanced")}

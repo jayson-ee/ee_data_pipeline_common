@@ -1,0 +1,21 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`,
+    dependencies: "mapping_shopify_sales_channel" 
+}
+
+with mapping as (
+select distinct
+trim(lower(source_id)) source_id
+,trim(lower(source_name)) source_name
+from `${settings.mapping_shopify_sales_channel_table}`
+)
+
+, deduplicated as (
+select *
+from mapping
+qualify row_number() over (partition by source_id order by source_name asc) = 1
+)
+
+select * 
+from deduplicated

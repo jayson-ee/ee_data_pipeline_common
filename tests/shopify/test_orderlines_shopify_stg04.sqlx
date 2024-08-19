@@ -1,0 +1,25 @@
+config { 
+type: "assertion",
+schema: `${settings.tests_dataset}`
+}
+
+with expected as (
+select
+count(*) records_in_previous_stage
+from ${ref("orderlines_shopify_stg03_with_refunds")}
+)
+
+, actual as (
+select
+count(*) records_in_current_stage
+from ${ref("orderlines_shopify_stg04_with_source")}
+)
+
+
+select
+expected.*, actual.* 
+from expected
+full outer join actual
+on true
+where expected.records_in_previous_stage != actual.records_in_current_stage
+

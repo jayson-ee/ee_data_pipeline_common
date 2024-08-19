@@ -1,0 +1,16 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`
+}
+
+with collection_names as (
+select 
+cast(ids.product_id as string) product_id
+,array_to_string(array_agg(distinct names.collection_name order by collection_name), ' | ') collection_name
+from `${settings.shopify_collects_table}` ids
+left join ${ref("mapping_collection_id_to_name")} names
+on ids.collection_id = names.collection_id
+group by product_id
+)
+
+select * from collection_names 

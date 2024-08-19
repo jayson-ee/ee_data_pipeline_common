@@ -1,0 +1,87 @@
+config {
+    type: "table"
+}
+
+WITH
+  raw_data_unnested AS ( 
+    (select * 
+    , date(order_timestamp, 'America/Chicago') order_date
+from ( select  
+      id AS order_id,
+      order_number,
+      ifnull(taxes_included,false) is_taxes_included,
+      
+          case 
+    when safe_cast(processed_at as timestamp) is null then safe_cast(created_at as timestamp)
+    when safe_cast(created_at as timestamp) is null then safe_cast(processed_at as timestamp)
+    else least(safe_cast(processed_at as timestamp), safe_cast(created_at as timestamp))
+    end order_timestamp,
+      ifnull(JSON_EXTRACT_SCALAR(line_items, '$.title'),'${settings.not_applicable_variable}') AS orderline_name,
+      JSON_EXTRACT_SCALAR(line_items, '$.sku') AS orderline_sku,
+      JSON_EXTRACT_SCALAR(line_items, '$.variant_id') AS orderline_variant_id,
+      JSON_EXTRACT_SCALAR(line_items, '$.product_id') AS orderline_product_id,
+      CAST(JSON_EXTRACT_SCALAR(line_items, '$.quantity') AS Int64) AS items_sold,
+      round(IFNULL(CAST(JSON_EXTRACT_SCALAR(line_items, '$.price_set.shop_money.amount') AS float64),0),2) AS orderline_gross_sales,
+      IFNULL((
+        SELECT
+          round(SUM(CAST(JSON_EXTRACT_SCALAR(discount_allocations, '$.amount_set.shop_money.amount') AS FLOAT64)),2)
+        FROM
+          UNNEST(JSON_EXTRACT_ARRAY(line_items, '$.discount_allocations')) AS discount_allocations ),0) AS orderline_discount,
+      IFNULL((
+        SELECT
+          SUM(CAST(JSON_EXTRACT_SCALAR(tax_lines, '$.price_set.shop_money.amount')AS FLOAT64))
+        FROM
+          UNNEST(JSON_EXTRACT_ARRAY(line_items, '$.tax_lines')) AS tax_lines ),0) AS orderline_tax
+      from ${settings.shopify_orders_table},
+      UNNEST(JSON_EXTRACT_ARRAY(line_items, '$')) AS line_items) 
+    ) ) 
+
+,with_orderline_share AS (
+  SELECT
+    * EXCEPT (order_gross_sales),
+    SAFE_DIVIDE(orderline_gross_sales,order_gross_sales) orderline_share_in_order
+  FROM (
+    SELECT
+      *,
+      SUM(orderline_gross_sales) OVER (PARTITION BY order_id) order_gross_sales
+    FROM
+      raw_data_unnested )) 
+  
+,with_cogs as (
+select with_orderline_share.*, cogs.orderline_cogs
+from with_orderline_share
+left join ${ref("orderlines_cogs")} cogs
+on with_orderline_share.orderline_sku=cogs.orderline_sku and with_orderline_share.order_date = cogs.order_date
+)
+
+, with_collection_name as (
+select orderlines.* 
+,collections.collection_name
+from with_cogs orderlines
+left join ${ref("mapping_product_id_to_collection_name")} collections
+on orderlines.orderline_product_id = collections.product_id
+)
+
+
+  SELECT
+    'order' transaction_type,
+    order_id,
+    order_number,
+    order_date,
+    order_timestamp,
+    orderline_name,
+    orderline_sku,
+    orderline_variant_id,
+    'NA' orderline_sku_category,
+    collection_name,
+    orderline_share_in_order,
+    items_sold,
+    orderline_gross_sales * items_sold - if(is_taxes_included,orderline_tax, 0)  orderline_gross_sales,
+    orderline_discount,
+    -- orderline_gross_sales * orderline_quantity - orderline_discount orderline_net_sales,
+    orderline_tax,
+    orderline_cogs
+  FROM
+    with_collection_name
+
+

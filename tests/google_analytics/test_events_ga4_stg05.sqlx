@@ -1,0 +1,25 @@
+config { 
+type: "assertion",
+schema: `${settings.tests_dataset}`
+}
+
+with expected as (
+select
+count(*) records_in_previous_stage
+from ${ref("events_ga4_stg04_with_session_engaged_calculated")}
+)
+
+, actual as (
+select
+count(*) records_in_current_stage
+from ${ref("events_ga4_stg05_with_campaign_name_from_gclid")}
+)
+
+
+select
+expected.*, actual.* 
+from expected
+full outer join actual
+on true
+where expected.records_in_previous_stage != actual.records_in_current_stage
+

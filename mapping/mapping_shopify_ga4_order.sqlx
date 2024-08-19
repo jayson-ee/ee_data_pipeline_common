@@ -1,0 +1,72 @@
+config {
+    type: "table",
+    schema: `${settings.mapping_dataset}`
+}
+
+with ga4 as (
+  select distinct transaction_id, transaction_timestamp ts
+  from ${ref("transactions_ga4_stg01")}
+  where date >= '2024-01-01'
+  qualify row_number() over (partition by transaction_id order by ts asc) = 1
+)
+
+, shopify as (
+select distinct order_id 
+,order_number
+,order_timestamp ts
+from ${ref("orderlines_shopify_stg02_with_order_level_data")}
+where order_date >= '2024-01-01'
+qualify row_number() over (partition by order_id order by ts asc) = 1
+)
+
+,joined_by_id as (
+select distinct shopify.order_id, ga4.transaction_id 
+,abs(timestamp_diff(ga4.ts,shopify.ts, second)) ts_diff_sec
+from shopify 
+join ga4
+on ga4.transaction_id = cast(shopify.order_id as string)
+or ga4.transaction_id = cast(shopify.order_number as string)
+)
+
+, shopify_not_matched as (
+select shopify.* from shopify
+left join joined_by_id on shopify.order_id=joined_by_id.order_id
+where joined_by_id.order_id is null
+)
+
+, ga4_not_matched as (
+select ga4.* from ga4 
+left join joined_by_id
+on ga4.transaction_id = joined_by_id.transaction_id
+where joined_by_id.order_id is null
+)
+
+,joined_by_ts as (
+select shopify_not_matched.order_id, ga4_not_matched.transaction_id
+,abs(timestamp_diff(ga4_not_matched.ts,shopify_not_matched.ts, second)) ts_diff_sec
+from ga4_not_matched
+join shopify_not_matched 
+on abs(timestamp_diff(ga4_not_matched.ts,shopify_not_matched.ts, second)) <90
+qualify row_number() over (partition by order_id order by ts_diff_sec asc) = 1
+)
+
+,joined_all as (
+select * from (select distinct order_id, transaction_id
+,min(ts_diff_sec) over(partition by order_id, transaction_id) ts_diff_sec_min
+ from (
+select order_id, transaction_id, ts_diff_sec, 'j2' source_order from joined_by_ts
+union all 
+select order_id, transaction_id, ts_diff_sec, 'j1' source_order from joined_by_id
+)
+)
+qualify rank() over (partition by transaction_id order by ts_diff_sec_min asc) = 1
+)
+
+
+, final as (
+select order_id, array_agg(transaction_id) ga4_transaction_ids
+from joined_all
+group by order_id
+)
+
+select * from final
